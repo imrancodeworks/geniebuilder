@@ -1,0 +1,315 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Space+Mono:wght@400;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:        #F2EAE0;
+  --bg-secondary:   #EDE3D8;
+  --bg-card:        #FDFAF6;
+  --bg-surface:     #E8DDD0;
+  --bg-hover:       #E2D5C8;
+  --accent-a:       #9B8EC7;
+  --accent-b:       #BDA6CE;
+  --accent-c:       #B4D3D9;
+  --accent-a-dim:   rgba(155,142,199,0.12);
+  --accent-b-dim:   rgba(189,166,206,0.12);
+  --accent-c-dim:   rgba(180,211,217,0.14);
+  --text-primary:   #2A1F3D;
+  --text-secondary: #5A4E6E;
+  --text-muted:     #9488A8;
+  --border:         rgba(155,142,199,0.22);
+  --border-strong:  rgba(155,142,199,0.45);
+  --success:        #3D8B5E;
+  --warning:        #A06820;
+  --danger:         #B84040;
+  --success-dim:    rgba(61,139,94,0.10);
+  --warning-dim:    rgba(160,104,32,0.10);
+  --danger-dim:     rgba(184,64,64,0.10);
+  --shadow:         0 4px 24px rgba(155,142,199,0.14);
+  --shadow-card:    0 2px 12px rgba(155,142,199,0.10);
+  --glow-a:         rgba(155,142,199,0.55);
+  --glow-b:         rgba(189,166,206,0.55);
+  --glow-success:   rgba(61,139,94,0.55);
+  --glow-danger:    rgba(184,64,64,0.55);
+  --font-display:   'Playfair Display', serif;
+  --font-body:      'DM Sans', sans-serif;
+  --font-mono:      'Space Mono', monospace;
+}
+
+[data-theme="dark"] {
+  --bg-base:        #0D0D0D;
+  --bg-secondary:   #141414;
+  --bg-card:        #1A1810;
+  --bg-surface:     #201E15;
+  --bg-hover:       #252215;
+  --accent-a:       #D4A843;
+  --accent-b:       #E8C97A;
+  --accent-c:       #C4954A;
+  --accent-a-dim:   rgba(212,168,67,0.10);
+  --accent-b-dim:   rgba(232,201,122,0.08);
+  --accent-c-dim:   rgba(196,149,74,0.10);
+  --text-primary:   #F0E8D0;
+  --text-secondary: #B8A878;
+  --text-muted:     #7A6E50;
+  --border:         rgba(212,168,67,0.15);
+  --border-strong:  rgba(212,168,67,0.35);
+  --success:        #5A9E6E;
+  --warning:        #C49840;
+  --danger:         #C85050;
+  --success-dim:    rgba(90,158,110,0.12);
+  --warning-dim:    rgba(196,152,64,0.12);
+  --danger-dim:     rgba(200,80,80,0.12);
+  --shadow:         0 4px 32px rgba(0,0,0,0.5);
+  --shadow-card:    0 2px 16px rgba(0,0,0,0.4);
+  --glow-a:         rgba(212,168,67,0.6);
+  --glow-b:         rgba(232,201,122,0.5);
+  --glow-success:   rgba(90,158,110,0.6);
+  --glow-danger:    rgba(200,80,80,0.6);
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--accent-a); border-radius: 4px; }
+
+/* ── Keyframe Animations ───────────────────────────────────────────────────── */
+@keyframes pulse        { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes wave0        { 0%{height:4px}  100%{height:28px} }
+@keyframes wave1        { 0%{height:6px}  100%{height:20px} }
+@keyframes wave2        { 0%{height:4px}  100%{height:36px} }
+@keyframes wave3        { 0%{height:8px}  100%{height:16px} }
+@keyframes wave4        { 0%{height:4px}  100%{height:24px} }
+@keyframes spin         { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes fadeUp       { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn       { from{opacity:0} to{opacity:1} }
+@keyframes shimmer      { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+@keyframes confettiFall { 0%{transform:translateY(-10px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+@keyframes scaleIn      { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
+@keyframes glowPulse    { 0%,100%{box-shadow:0 0 10px var(--glow-a),0 0 22px var(--glow-a)} 50%{box-shadow:0 0 24px var(--glow-a),0 0 50px var(--glow-a),0 0 8px var(--accent-a) inset} }
+@keyframes shimmerSlide { 0%{background-position:-200% center} 100%{background-position:200% center} }
+@keyframes float        { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-5px)} }
+@keyframes borderGlow   { 0%,100%{border-color:var(--border)} 50%{border-color:var(--accent-a);box-shadow:0 0 14px var(--glow-a)} }
+@keyframes popIn        { 0%{transform:scale(0.85) translateY(6px);opacity:0} 60%{transform:scale(1.04) translateY(-2px)} 100%{transform:scale(1) translateY(0);opacity:1} }
+@keyframes pressDown    { 0%,100%{transform:scale(1)} 50%{transform:scale(0.96)} }
+
+/* ── Skeleton ──────────────────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--bg-hover) 50%, var(--bg-surface) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: 8px;
+}
+
+/* ── Global button base transition ────────────────────────────────────────── */
+button {
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    opacity 0.15s ease;
+}
+
+/* ── PRIMARY CTA button ────────────────────────────────────────────────────── */
+/* Shimmer sweep + deep glow */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+  background: var(--accent-a) !important;
+  color: var(--bg-card) !important;
+  border: none !important;
+  box-shadow: 0 4px 16px var(--glow-a), 0 1px 0 rgba(255,255,255,0.15) inset !important;
+}
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+}
+.btn-primary:hover:not([disabled])::after { left: 160%; }
+.btn-primary:hover:not([disabled]) {
+  transform: translateY(-3px) scale(1.025) !important;
+  box-shadow: 0 10px 36px var(--glow-a), 0 4px 14px var(--glow-a), 0 1px 0 rgba(255,255,255,0.22) inset !important;
+}
+.btn-primary:active:not([disabled]) {
+  transform: translateY(-1px) scale(0.98) !important;
+  box-shadow: 0 4px 14px var(--glow-a) !important;
+}
+
+/* ── GHOST button ──────────────────────────────────────────────────────────── */
+.btn-ghost {
+  position: relative;
+  background: var(--bg-surface) !important;
+  border: 1.5px solid var(--border) !important;
+}
+.btn-ghost:hover:not([disabled]) {
+  border-color: var(--accent-a) !important;
+  color: var(--accent-a) !important;
+  background: var(--accent-a-dim) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px var(--glow-a), 0 0 0 1px var(--accent-a) !important;
+}
+.btn-ghost:active:not([disabled]) {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+/* ── DANGER ghost button ───────────────────────────────────────────────────── */
+.btn-danger:hover:not([disabled]) {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+  background: var(--danger-dim) !important;
+  box-shadow: 0 6px 22px var(--glow-danger) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* ── PILL tag buttons (difficulty, timer, source) ──────────────────────────── */
+.pill-btn {
+  cursor: pointer;
+}
+.pill-btn:hover:not([disabled]) {
+  border-color: var(--accent-a) !important;
+  color: var(--accent-a) !important;
+  background: var(--accent-a-dim) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 14px var(--glow-a) !important;
+}
+.pill-btn.pill-active {
+  box-shadow: 0 3px 14px var(--glow-a) !important;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ── ROLE CARD (extended roles section) ────────────────────────────────────── */
+.role-card {
+  cursor: pointer;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease !important;
+}
+.role-card:hover {
+  transform: translateY(-5px) scale(1.025) !important;
+  box-shadow: 0 14px 36px var(--glow-a), 0 4px 14px rgba(0,0,0,0.08) !important;
+  border-color: var(--accent-a) !important;
+}
+.role-card.role-active {
+  transform: translateY(-3px) scale(1.015) !important;
+  box-shadow: 0 10px 30px var(--glow-a) !important;
+  border-color: var(--accent-a) !important;
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* ── PERSONA CARD ──────────────────────────────────────────────────────────── */
+.persona-card {
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+.persona-card:hover {
+  border-color: var(--accent-b) !important;
+  transform: translateY(-3px) scale(1.02) !important;
+  box-shadow: 0 8px 24px var(--glow-b) !important;
+}
+.persona-card.persona-active {
+  box-shadow: 0 8px 28px var(--glow-a) !important;
+  animation: glowPulse 2.8s ease-in-out infinite;
+}
+
+/* ── FEATURE CARD ──────────────────────────────────────────────────────────── */
+.feature-card {
+  transition: all 0.22s ease !important;
+}
+.feature-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 10px 28px rgba(155,142,199,0.2), 0 0 0 1.5px var(--border-strong) !important;
+}
+
+/* ── SEARCH BAR focus glow ─────────────────────────────────────────────────── */
+.search-bar:focus-within {
+  border-color: var(--accent-a) !important;
+  box-shadow: 0 0 0 3px var(--accent-a-dim), 0 10px 36px var(--glow-a) !important;
+}
+
+/* ── SHINE text (hero heading accent) ──────────────────────────────────────── */
+.shine-text {
+  background: linear-gradient(90deg, var(--accent-a) 0%, var(--accent-b) 35%, var(--accent-c) 60%, var(--accent-a) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmerSlide 3.5s linear infinite;
+}
+
+/* ── MODE TOGGLE ───────────────────────────────────────────────────────────── */
+.mode-toggle {
+  transition: box-shadow 0.35s ease !important;
+}
+.mode-toggle-ai   { box-shadow: 0 0 22px var(--glow-a), 0 2px 8px rgba(0,0,0,0.1) !important; }
+.mode-toggle-smart{ box-shadow: 0 0 22px var(--glow-success), 0 2px 8px rgba(0,0,0,0.1) !important; }
+
+/* ── SUBMIT ANSWER button ──────────────────────────────────────────────────── */
+.submit-btn {
+  box-shadow: 0 4px 18px var(--glow-a) !important;
+}
+.submit-btn:hover:not([disabled]) {
+  transform: translateY(-4px) scale(1.04) !important;
+  box-shadow: 0 12px 40px var(--glow-a), 0 4px 16px var(--glow-a) !important;
+}
+.submit-btn:active:not([disabled]) {
+  transform: translateY(-1px) scale(0.99) !important;
+}
+
+/* ── NAV buttons ───────────────────────────────────────────────────────────── */
+.nav-btn {
+  transition: all 0.16s ease !important;
+}
+.nav-btn:hover {
+  color: var(--accent-a) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── Category badge hover ──────────────────────────────────────────────────── */
+.cat-badge {
+  transition: all 0.16s ease;
+}
+.cat-badge:hover {
+  transform: scale(1.08);
+  box-shadow: 0 3px 12px var(--glow-a);
+}
+
+/* ── Float & glow utility classes ──────────────────────────────────────────── */
+.float-anim   { animation: float 3.2s ease-in-out infinite; }
+.glow-pulse   { animation: glowPulse 2.5s ease-in-out infinite; }
+.pop-in       { animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .resp-flex-col   { flex-direction: column !important; align-items: stretch !important; }
+  .resp-nav        { padding: 12px 16px !important; height: auto !important; flex-wrap: wrap !important; gap: 12px !important; }
+  .resp-padding    { padding: 16px 12px !important; }
+  .resp-hero       { padding: 40px 0 32px !important; }
+  .resp-wrap       { flex-wrap: wrap !important; }
+  .resp-modal      { margin: 8px !important; max-height: 98vh !important; width: calc(100% - 16px) !important; }
+  .resp-grid-1     { grid-template-columns: 1fr !important; }
+  .resp-text-center{ text-align: center !important; justify-content: center !important; }
+  .resp-card-row   { flex-direction: column !important; align-items: stretch !important; gap: 16px !important; }
+  .resp-search-input{ width: 100% !important; padding: 16px !important; }
+  .resp-search-btn { width: calc(100% - 12px) !important; margin: 6px !important; }
+  .hide-mobile     { display: none !important; }
+  .role-card:hover { transform: translateY(-2px) scale(1.01) !important; }
+  .btn-primary:hover:not([disabled]) { transform: translateY(-2px) scale(1.01) !important; }
+}
+
+@media (max-width: 1024px) {
+  .tablet-p-md { padding: 24px !important; }
+}
