@@ -1,15 +1,6 @@
 """
 Resume Screening & Job Matching API
 FastAPI backend — no generative AI, pure NLP + ML.
-
-Endpoints:
-  POST /api/upload-resume     — upload and parse one resume
-  POST /api/job-description   — submit and parse a job description
-  POST /api/match             — match parsed resumes against a JD
-  GET  /api/candidates        — list all uploaded candidates
-  GET  /api/candidate/{id}    — get single candidate details
-  DELETE /api/candidate/{id}  — remove a candidate
-  GET  /api/health            — health check
 """
 
 import uuid
@@ -19,8 +10,6 @@ from passlib.context import CryptContext
 from typing import Optional, List
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends, Request, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel, EmailStr
 from dotenv import load_dotenv
 import random
@@ -32,13 +21,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from auth import get_current_user, create_access_token, TokenData
-
-from parsers.resume_parser import parse_resume_file
-from nlp.extractor import extract_resume, extract_job_description
-from matching.scorer import rank_candidates, score_candidate
-
-from database import client, candidates_collection, jd_collection, users_collection, otp_collection
+# 1. FIXED: Added 'backend.' prefix to all local imports to prevent Render crashes
+from backend.auth import get_current_user, create_access_token, TokenData
+from backend.parsers.resume_parser import parse_resume_file
+from backend.nlp.extractor import extract_resume, extract_job_description
+from backend.matching.scorer import rank_candidates, score_candidate
+from backend.database import client, candidates_collection, jd_collection, users_collection, otp_collection
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -145,24 +133,17 @@ def send_otp_email(target_email: str, otp: str):
         logger.warning(f"SMTP credentials missing. OTP for {target_email} was printed to terminal.")
         return
 
-    msg = MIMEText(f"Your GenieBuilder OTP is: {otp}. It expires in 10 minutes.")
-
+    msg = MIMEText(f"Your OTP is: {otp}. It expires in 10 minutes.")
     msg['Subject'] = 'Your Password Reset OTP'
     msg['From'] = smtp_user
     msg['To'] = target_email
 
     try:
-        print(f"DEBUG: Attempting to send OTP email to {target_email} using {smtp_host}:{smtp_port}...")
         with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            print("DEBUG: Connected to SMTP server. Starting TLS...")
             server.starttls()
-            print(f"DEBUG: TLS started. Logging in as {smtp_user}...")
             server.login(smtp_user, smtp_pass)
-            print("DEBUG: Login successful. Sending message...")
             server.send_message(msg)
-            print(f"DEBUG: Email SENT successfully to {target_email}")
     except Exception as e:
-        print(f"DEBUG ERROR: Failed to send email to {target_email}: {str(e)}")
         logger.error(f"Failed to send email: {e}")
 
 @app.post("/api/forgot-password")
@@ -171,15 +152,14 @@ async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTask
     _require_db()
     user = users_collection.find_one({"email": body.email})
     if not user:
-        # Don't reveal if email exists, but we won't send anything
         return {"message": "If this email is registered, you will receive an OTP."}
 
     otp = str(random.randint(100000, 999999))
     expiry = datetime.utcnow() + timedelta(minutes=10)
     
-    # Store OTP (overwrite if exists)
-    from database import otp_collection
-    otp_collection.update_one(
+    # 2. FIXED: Updated lazy import path
+    from backend.database import otp_collection as local_otp_collection
+    local_otp_collection.update_one(
         {"email": body.email},
         {"$set": {"otp": otp, "expires_at": expiry}},
         upsert=True
@@ -192,13 +172,13 @@ async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTask
 def verify_otp(body: VerifyOTP):
     """Check if the provided OTP is valid and not expired."""
     _require_db()
-    from database import otp_collection
-    record = otp_collection.find_one({"email": body.email})
+    from backend.database import otp_collection as local_otp_collection
+    record = local_otp_collection.find_one({"email": body.email})
     if not record or record["otp"] != body.otp:
         raise HTTPException(400, "Invalid or expired OTP.")
     
     if datetime.utcnow() > record["expires_at"]:
-        otp_collection.delete_one({"email": body.email})
+        local_otp_collection.delete_one({"email": body.email})
         raise HTTPException(400, "OTP has expired.")
     
     return {"message": "OTP verified successfully."}
@@ -207,21 +187,21 @@ def verify_otp(body: VerifyOTP):
 def reset_password(body: ResetPassword):
     """Change user password after OTP verification."""
     _require_db()
-    from database import otp_collection, users_collection
+    from backend.database import otp_collection as local_otp_collection
+    from backend.database import users_collection as local_users_collection
     
-    record = otp_collection.find_one({"email": body.email})
+    record = local_otp_collection.find_one({"email": body.email})
     if not record or record["otp"] != body.otp:
         raise HTTPException(400, "Security validation failed. Please request a new OTP.")
     
     if datetime.utcnow() > record["expires_at"]:
-        otp_collection.delete_one({"email": body.email})
+        local_otp_collection.delete_one({"email": body.email})
         raise HTTPException(400, "OTP has expired.")
     
     hashed_password = pwd_context.hash(body.new_password)
-    users_collection.update_one({"email": body.email}, {"$set": {"password": hashed_password}})
+    local_users_collection.update_one({"email": body.email}, {"$set": {"password": hashed_password}})
     
-    # Delete OTP after successful reset
-    otp_collection.delete_one({"email": body.email})
+    local_otp_collection.delete_one({"email": body.email})
     return {"message": "Password updated successfully."}
 
 @app.post("/api/login")
@@ -234,10 +214,8 @@ def login(user: UserAuth):
             raise HTTPException(401, "Invalid email or password.")
     except Exception as e:
         logger.error(f"Login failed: {e}")
-        # If hash is unknown (plaintext in DB), return 401 instead of 500
         raise HTTPException(401, "Invalid email or password. If you are an old user, please use Forgot Password to reset.")
     
-    # Fallback for old users who do not have the custom 'id' field
     user_id = db_user.get("id") or str(db_user["_id"])
     
     access_token = create_access_token(data={"sub": db_user["email"], "id": user_id})
@@ -302,10 +280,7 @@ def health():
 @app.post("/api/upload-resume")
 @limiter.limit("10/minute")
 async def upload_resume(request: Request, file: UploadFile = File(...), current_user: TokenData = Depends(get_current_user)):
-    """
-    Upload a resume file (PDF, DOCX, or TXT).
-    Returns parsed structured data.
-    """
+    """Upload a resume file (PDF, DOCX, or TXT). Returns parsed structured data."""
     _require_db()
     if not file.filename:
         raise HTTPException(400, "No file provided.")
@@ -330,9 +305,8 @@ async def upload_resume(request: Request, file: UploadFile = File(...), current_
     parsed["filename"] = file.filename
     parsed["file_size_kb"] = round(len(content) / 1024, 1)
 
-    # Insert into MongoDB
     candidates_collection.insert_one(parsed)
-    logger.info(f"Parsed & stored resume: {parsed.get('name')} ({file.filename}) for user {current_user.email}")
+    logger.info(f"Parsed & stored resume: {parsed.get('name')} ({file.filename})")
 
     return {
         "id": candidate_id,
@@ -360,11 +334,7 @@ def submit_job_description(body: JobDescriptionRequest, current_user: TokenData 
     parsed["jd_id"] = str(uuid.uuid4())
     parsed["user_id"] = current_user.user_id
 
-    # Do NOT delete many. We keep multiple JDs per user.
     jd_collection.insert_one(parsed)
-    
-    logger.info(f"JD loaded into DB: {body.title} — {len(parsed.get('required_skills', []))} required skills detected for user {current_user.email}")
-
     return {
         "title": body.title,
         "company": body.company,
@@ -380,15 +350,12 @@ def submit_job_description(body: JobDescriptionRequest, current_user: TokenData 
 @app.post("/api/match")
 @limiter.limit("20/minute")
 def match_candidates(request: Request, body: MatchRequest, current_user: TokenData = Depends(get_current_user)):
-    """
-    Rank all (or selected) candidates against the current job description.
-    """
+    """Rank all (or selected) candidates against the current job description."""
     _require_db()
     jd_query = {"user_id": current_user.user_id}
     if body.jd_id:
         jd_query["jd_id"] = body.jd_id
 
-    # Find the most recently added matching JD
     current_jd = jd_collection.find_one(jd_query, {"_id": 0}, sort=[("_id", -1)])
     if not current_jd:
         raise HTTPException(400, "No job description found. Submit one via POST /api/job-description first.")
@@ -396,7 +363,7 @@ def match_candidates(request: Request, body: MatchRequest, current_user: TokenDa
     candidate_query = {"user_id": current_user.user_id}
     total_candidates = candidates_collection.count_documents(candidate_query)
     if total_candidates == 0:
-        raise HTTPException(400, "No resumes uploaded in DB. Upload resumes via POST /api/upload-resume first.")
+        raise HTTPException(400, "No resumes uploaded in DB.")
 
     if body.candidate_ids:
         candidate_query["id"] = {"$in": body.candidate_ids}
@@ -471,8 +438,6 @@ import io
 def export_candidates_pdf(current_user: TokenData = Depends(get_current_user)):
     """Export the list of candidates as a PDF report."""
     _require_db()
-    
-    # We export the top candidates for the latest JD
     jd = jd_collection.find_one({"user_id": current_user.user_id}, {"_id": 0}, sort=[("_id", -1)])
     if not jd:
         raise HTTPException(400, "No active job description found. Cannot generate report.")
@@ -507,7 +472,6 @@ def export_candidates_pdf(current_user: TokenData = Depends(get_current_user)):
         media_type="application/pdf", 
         headers={"Content-Disposition": "attachment; filename=candidate_ranking_report.pdf"}
     )
-
 
 
 @app.get("/api/candidate/{candidate_id}")
@@ -562,16 +526,3 @@ def clear_all_candidates(current_user: TokenData = Depends(get_current_user)):
     _require_db()
     res = candidates_collection.delete_many({"user_id": current_user.user_id})
     return {"message": f"Removed {res.deleted_count} candidate(s)."}
-
-
-# ─── Serve frontend ───────────────────────────────────────────────────────────
-
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "PrepAI-v4", "dist")
-
-
-if os.path.isdir(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-
-    @app.get("/")
-    def serve_frontend():
-        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
