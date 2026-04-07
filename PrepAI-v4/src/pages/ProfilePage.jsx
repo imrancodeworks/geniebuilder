@@ -16,7 +16,7 @@ export default function ProfilePage({ onHome }) {
     // Initial sync with backend to ensure session is valid
     const fetchProfile = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/profile`, {
+        const response = await fetch(`${API_BASE_URL}/api/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (response.status === 401) {
@@ -49,7 +49,7 @@ export default function ProfilePage({ onHome }) {
     setLoading(true);
     setMessage({ type: '', text: '' });
     try {
-      const response = await fetch(`${API_BASE_URL}/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

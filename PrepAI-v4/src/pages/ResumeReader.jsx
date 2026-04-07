@@ -58,7 +58,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
   const fetchCandidates = async (reset = false) => {
     try {
       const currentSkip = reset ? 0 : skip;
-      const res = await authFetch(`${API_URL}/candidates?skip=${currentSkip}&limit=10`);
+      const res = await authFetch(`${API_URL}/api/candidates?skip=${currentSkip}&limit=10`);
       if (res && res.ok) {
         const data = await res.json();
         if (reset) {
@@ -75,7 +75,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
 
   const fetchJds = async () => {
     try {
-      const res = await authFetch(`${API_URL}/jds`);
+      const res = await authFetch(`${API_URL}/api/jds`);
       if (res && res.ok) {
         const data = await res.json();
         setSavedJds(data.job_descriptions || []);
@@ -97,7 +97,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
     e.preventDefault();
     if (!jobDesc || jobDesc.length < 50) return alert('JD too short. Must be at least 50 characters.');
     try {
-      const res = await authFetch(`${API_URL}/job-description`, {
+      const res = await authFetch(`${API_URL}/api/job-description`, {
         method: 'POST',
         body: JSON.stringify({ title: jobTitle, company, description: jobDesc })
       });
@@ -123,7 +123,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await authFetch(`${API_URL}/upload-resume`, {
+      const res = await authFetch(`${API_URL}/api/upload-resume`, {
         method: 'POST',
         body: formData
       });
@@ -144,7 +144,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
 
   const handleDeleteCandidate = async (id) => {
     try {
-      const res = await authFetch(`${API_URL}/candidate/${id}`, { method: 'DELETE' });
+      const res = await authFetch(`${API_URL}/api/candidate/${id}`, { method: 'DELETE' });
       if (res && res.ok) {
         fetchCandidates(true);
       }
@@ -158,7 +158,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
     setMatching(true);
     setActiveTab('match');
     try {
-      const res = await authFetch(`${API_URL}/match`, {
+      const res = await authFetch(`${API_URL}/api/match`, {
         method: 'POST',
         body: JSON.stringify({ jd_id: jdDetails.id })
       });
@@ -182,7 +182,7 @@ export default function ResumeReader({ onHome, onProfile, onLogout }) {
     if (!jdDetails) return;
     setExporting(true);
     try {
-      const res = await authFetch(`${API_URL}/candidates/export?jd_id=${jdDetails.id}`);
+      const res = await authFetch(`${API_URL}/api/candidates/export?jd_id=${jdDetails.id}`);
       if (res && res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
