@@ -45,31 +45,26 @@ GenieBuilder/
 | Gap analysis | Rule-based | Missing skills, exp gaps, edu gaps |
 | Ranking | Sort by weighted total | Descending score order |
 
----
+## 🚀 Deployment (Vercel + Render Split)
 
-## Quick Setup
+This project is optimized to run as a split-stack application for maximum reliability.
 
-### 1. Install dependencies
+### 1. Backend (Render)
+- **Repo Root**: `/`
+- **Build Command**: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
+- **Start Command**: `gunicorn backend.main:app -k uvicorn.workers.UvicornWorker`
+- **Env Vars**:
+    - `MONGO_URI`: Your MongoDB Atlas string.
+    - `JWT_SECRET`: Random secure hex string.
+    - `ALLOWED_ORIGINS`: Your Vercel URL (e.g., `https://your-app.vercel.app`).
 
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Download the spaCy model
-
-```bash
-python -m spacy download en_core_web_sm
-```
-
-### 3. Run the app
-
-```bash
-python run.py
-```
-
-Open **http://localhost:8000** — the dashboard loads in your browser.
-
-API docs: **http://localhost:8000/docs**
+### 2. Frontend (Vercel)
+- **Framework**: Vite
+- **Root Directory**: `PrepAI-v4`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Env Var**:
+    - `VITE_API_URL`: Your Render Backend URL + `/api` (e.g., `https://your-backend.onrender.com/api`).
 
 ---
 
