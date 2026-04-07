@@ -18,3 +18,5 @@ slowapi
 python-magic
 # Note: For python-magic on Windows, python-magic-bin is usually needed instead. Let's add that.
 python-magic-bin; sys_platform == 'win32'
+spacy==3.7.5
+
