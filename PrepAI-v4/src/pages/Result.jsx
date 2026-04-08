@@ -93,12 +93,12 @@ export default function Result({ answers, role, onRetry, onHome, onDashboard, on
         </span>
         <div className="resp-wrap" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <button onClick={() => exportToPDF(answers, role, avg)} className="hide-mobile" style={{
+          <button onClick={() => exportToPDF(answers, role, avg)} style={{
             background: 'var(--accent-a-dim)', border: '1px solid var(--accent-a)',
             color: 'var(--accent-a)', borderRadius: 8, padding: '7px 14px',
             fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-body)',
           }}>
-            ↓ Export PDF
+            ↓ Export
           </button>
           <button onClick={onDashboard} style={{
             background: 'var(--bg-surface)', border: '1px solid var(--border)',
@@ -167,6 +167,29 @@ export default function Result({ answers, role, onRetry, onHome, onDashboard, on
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Mobile export banner */}
+        <div className="show-mobile-export" style={{
+          display: 'none', background: 'var(--accent-a-dim)',
+          border: '1px solid var(--accent-a)', borderRadius: 12,
+          padding: '14px 20px', marginBottom: 20,
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ fontSize: 13, color: 'var(--accent-a)', fontWeight: 600 }}>
+            📄 Save your session report
+          </div>
+          <button
+            onClick={() => exportToPDF(answers, role, avg)}
+            style={{
+              background: 'var(--accent-a)', color: 'var(--bg-card)',
+              border: 'none', borderRadius: 8, padding: '9px 18px',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
+            }}
+          >
+            ↓ Export PDF
+          </button>
         </div>
 
         {/* Bar chart */}
@@ -299,4 +322,4 @@ export default function Result({ answers, role, onRetry, onHome, onDashboard, on
       </div>
     </div>
   );
-}
+      }
