@@ -10,6 +10,9 @@ const LoginPage = ({ onLogin, onSignup }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Forgot Password Flow State
   const [view, setView] = useState('login'); // login, forgot, otp, reset
@@ -26,8 +29,6 @@ const LoginPage = ({ onLogin, onSignup }) => {
     }
     return () => clearInterval(timer);
   }, [resendCooldown]);
-
-
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('geniebuilder_remembered_email');
@@ -78,7 +79,7 @@ const LoginPage = ({ onLogin, onSignup }) => {
   };
 
   const handleForgotPassword = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     resetStates();
     setLoading(true);
     try {
@@ -121,6 +122,7 @@ const LoginPage = ({ onLogin, onSignup }) => {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) return setError('Passwords do not match');
+    if (newPassword.length < 6) return setError('Password must be at least 6 characters');
     resetStates();
     setLoading(true);
     try {
@@ -134,8 +136,11 @@ const LoginPage = ({ onLogin, onSignup }) => {
         })
       });
       if (res.ok) {
-        alert('Password reset successful! Please log in.');
-        setView('login');
+        setMessage('Password reset successful! Please log in.');
+        setTimeout(() => {
+          setView('login');
+          setMessage('');
+        }, 2000);
       } else {
         const data = await res.json();
         setError(data.detail || 'Failed to reset password');
@@ -144,74 +149,117 @@ const LoginPage = ({ onLogin, onSignup }) => {
     finally { setLoading(false); }
   };
 
+  const EyeIcon = ({ show }) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {show ? (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </>
+      ) : (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </>
+      )}
+    </svg>
+  );
+
   return (
     <div className="login-page-container">
       <style>{`
         .login-page-container {
             background-image: url('/ruru.png');
             background-repeat: no-repeat;
-            height: 100vh;
+            min-height: 100vh;
             background-size: cover;
+            background-position: center;
             display: flex;
             justify-content: center;
             align-items: center;
-            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
             font-family: 'DM Sans', sans-serif;
-            width: 100vw;
+            width: 100%;
         }
         #logincontainer {
-            border: 0px solid;
             position: relative;
-            padding: 40px;
-            height: auto;
-            min-height: 400px;
-            width: 380px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
+            padding: 36px 32px;
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
             color: #fff;
             animation: fadeIn 0.5s ease;
+            box-sizing: border-box;
+        }
+        @media (max-width: 480px) {
+            #logincontainer { padding: 28px 20px; border-radius: 18px; }
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-        h2 { text-align: center; font-size: 2rem; margin-bottom: 25px; font-weight: 700; letter-spacing: -1px; }
+        .login-title { text-align: center; font-size: 1.8rem; margin-bottom: 22px; font-weight: 700; letter-spacing: -0.5px; }
         
-        .input-group { position: relative; margin-bottom: 18px; }
+        .input-group { position: relative; margin-bottom: 16px; }
         .input-group input {
             width: 100%;
-            padding: 12px 15px;
+            padding: 13px 16px;
             border: none;
             border-radius: 12px;
             outline: none;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.18);
             color: #fff;
             font-size: 15px;
             transition: all 0.3s ease;
+            box-sizing: border-box;
+            font-family: 'DM Sans', sans-serif;
         }
-        .input-group input:focus { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 10px rgba(255, 255, 255, 0.1); }
-        
+        .input-group input::placeholder { color: rgba(255,255,255,0.55); }
+        .input-group input:focus { background: rgba(255, 255, 255, 0.28); box-shadow: 0 0 0 2px rgba(255,255,255,0.25); }
+        .input-group.has-eye input { padding-right: 46px; }
+        .eye-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.65);
+            cursor: pointer;
+            padding: 2px;
+            display: flex;
+            align-items: center;
+            transition: color 0.2s;
+        }
+        .eye-toggle:hover { color: #fff; }
+
         .error-msg {
-            background: rgba(211, 47, 47, 0.4);
-            border-left: 4px solid #ff4d4d;
-            padding: 8px 12px;
-            font-size: 12px;
-            margin-bottom: 20px;
-            border-radius: 4px;
+            background: rgba(211, 47, 47, 0.35);
+            border-left: 4px solid #ff5252;
+            padding: 10px 14px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            line-height: 1.5;
         }
         .success-msg {
-            background: rgba(46, 125, 50, 0.4);
+            background: rgba(46, 125, 50, 0.35);
             border-left: 4px solid #4caf50;
-            padding: 8px 12px;
-            font-size: 12px;
-            margin-bottom: 20px;
-            border-radius: 4px;
+            padding: 10px 14px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            line-height: 1.5;
         }
 
-        #check { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 25px; align-items: center; }
-        #check a { color: #fff; text-decoration: none; opacity: 0.8; transition: opacity 0.3s; cursor: pointer; }
-        #check a:hover { opacity: 1; text-decoration: underline; }
+        #check { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 22px; align-items: center; flex-wrap: wrap; gap: 8px; }
+        #check .forgot-link { color: #fff; text-decoration: none; opacity: 0.8; transition: opacity 0.3s; cursor: pointer; background: none; border: none; font-size: 13px; font-family: 'DM Sans', sans-serif; padding: 0; }
+        #check .forgot-link:hover { opacity: 1; text-decoration: underline; }
         #check label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
         
         .submit-btn {
@@ -229,61 +277,104 @@ const LoginPage = ({ onLogin, onSignup }) => {
           display: flex;
           justify-content: center;
           align-items: center;
+          font-family: 'DM Sans', sans-serif;
+          margin-top: 4px;
         }
-        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); background: #f8f8f8; }
-        .submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); background: #f0ecff; }
+        .submit-btn:active:not(:disabled) { transform: translateY(0); }
+        .submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
-        .back-link { display: block; text-align: center; margin-top: 15px; font-size: 13px; color: #fff; text-decoration: none; cursor: pointer; opacity: 0.8; }
-        .back-link:hover { opacity: 1; text-decoration: underline; }
+        .spinner {
+          width: 18px; height: 18px;
+          border: 2px solid rgba(42,31,61,0.3);
+          border-top-color: #2A1F3D;
+          border-radius: 50%;
+          animation: spin 0.7s linear infinite;
+          margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        #Register { margin-top: 25px; text-align: center; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
-        #Register a { color: #fff; font-weight: 700; text-decoration: none; margin-left: 5px; cursor: pointer; }
-        #Register a:hover { text-decoration: underline; }
+        .back-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: rgba(255,255,255,0.75); text-decoration: none; cursor: pointer; transition: color 0.2s; background: none; border: none; font-family: 'DM Sans', sans-serif; width: 100%; }
+        .back-link:hover { color: #fff; text-decoration: underline; }
+
+        #Register { margin-top: 22px; text-align: center; font-size: 14px; color: rgba(255, 255, 255, 0.75); }
+        #Register button { color: #fff; font-weight: 700; text-decoration: none; margin-left: 5px; cursor: pointer; background: none; border: none; font-size: 14px; font-family: 'DM Sans', sans-serif; }
+        #Register button:hover { text-decoration: underline; }
 
         .form-logo {
             text-align: center;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             animation: logoFadeIn 1s ease-out forwards;
             opacity: 0;
         }
         .form-logo img {
-            width: 140px;
-            filter: drop-shadow(0 0 10px rgba(189, 166, 206, 0.5));
+            width: 120px;
+            filter: drop-shadow(0 0 12px rgba(189, 166, 206, 0.6));
         }
         @keyframes logoFadeIn {
-            from { opacity: 0; transform: translateY(20px) scale(0.9); }
+            from { opacity: 0; transform: translateY(16px) scale(0.9); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
+
+        .otp-input-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+        .divider { display: flex; align-items: center; gap: 10px; margin: 10px 0 16px; }
+        .divider::before, .divider::after { content:''; flex:1; height:1px; background: rgba(255,255,255,0.2); }
+        .divider span { font-size: 11px; color: rgba(255,255,255,0.45); letter-spacing: 1px; }
+
+        .step-indicator { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; }
+        .step-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25); transition: background 0.3s; }
+        .step-dot.active { background: #fff; }
+        .step-dot.done { background: rgba(76,175,80,0.8); }
       `}</style>
 
-      <div id="logincontainer" style={{ minHeight: view === 'login' ? 400 : 350 }}>
+      <div id="logincontainer">
         <div className="form-logo">
           <img src="Gemini_Generated_Image_cky579cky579cky5-Photoroom.png" alt="GenieBuilder Logo" />
-
         </div>
+
+        {/* Step indicator for forgot password flow */}
+        {view !== 'login' && (
+          <div className="step-indicator">
+            {['forgot','otp','reset'].map((s, i) => (
+              <div key={s} className={`step-dot ${view === s ? 'active' : ['forgot','otp','reset'].indexOf(view) > i ? 'done' : ''}`} />
+            ))}
+          </div>
+        )}
         
         {view === 'login' && (
           <>
-            <h2>Login</h2>
-            {error && <div className="error-msg">{error}</div>}
+            <h2 className="login-title">Welcome Back</h2>
+            {error && <div className="error-msg">⚠️ {error}</div>}
             <form onSubmit={handleSubmit}>
               <div className="input-group">
-                <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <input type="email" placeholder="Email Address" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
               </div>
-              <div className="input-group">
-                <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <div className="input-group has-eye">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  placeholder="Password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  required 
+                  autoComplete="current-password"
+                />
+                <button type="button" className="eye-toggle" onClick={() => setShowPassword(p => !p)} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  <EyeIcon show={showPassword} />
+                </button>
               </div>
               <div id="check">
                 <label>
                   <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} /> Remember Me
                 </label>
-                <a onClick={() => setView('forgot')}>Forgot password?</a>
+                <button type="button" className="forgot-link" onClick={() => { resetStates(); setEmailForReset(email); setView('forgot'); }}>
+                  Forgot password?
+                </button>
               </div>
               <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? <><span className="spinner"/>'Logging in...'</> : 'Login'}
               </button>
               <div id="Register">
-                Don't have an account? <a onClick={onSignup}>Sign Up</a>
+                Don't have an account? <button type="button" onClick={onSignup}>Sign Up</button>
               </div>
             </form>
           </>
@@ -291,75 +382,108 @@ const LoginPage = ({ onLogin, onSignup }) => {
 
         {view === 'forgot' && (
           <>
-            <h2>Reset Password</h2>
-            {error && <div className="error-msg">{error}</div>}
-            {message && <div className="success-msg">{message}</div>}
-            <p style={{ fontSize: 13, textAlign: 'center', marginBottom: 20, opacity: 0.9 }}>
-              Enter your email address and we'll send you a 6-digit OTP to reset your password.
+            <h2 className="login-title">Reset Password</h2>
+            {error && <div className="error-msg">⚠️ {error}</div>}
+            {message && <div className="success-msg">✓ {message}</div>}
+            <p style={{ fontSize: 13, textAlign: 'center', marginBottom: 20, opacity: 0.85, lineHeight: 1.6 }}>
+              Enter your registered email and we'll send you a 6-digit OTP.
             </p>
             <form onSubmit={handleForgotPassword}>
               <div className="input-group">
-                <input type="email" placeholder="Email Address" value={emailForReset} onChange={(e) => setEmailForReset(e.target.value)} required />
+                <input 
+                  type="email" 
+                  placeholder="Email Address" 
+                  value={emailForReset} 
+                  onChange={(e) => setEmailForReset(e.target.value)} 
+                  required 
+                  autoComplete="email"
+                />
               </div>
               <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Sending OTP...' : 'Send OTP'}
+                {loading ? <><span className="spinner"/>Sending OTP...</> : 'Send OTP'}
               </button>
-              <a className="back-link" onClick={() => setView('login')}>Back to Login</a>
+              <button type="button" className="back-link" onClick={() => { resetStates(); setView('login'); }}>← Back to Login</button>
             </form>
           </>
         )}
 
         {view === 'otp' && (
           <>
-            <h2>Verify OTP</h2>
-            {error && <div className="error-msg">{error}</div>}
-            {message && <div className="success-msg">{message}</div>}
-            <p style={{ fontSize: 13, textAlign: 'center', marginBottom: 20, opacity: 0.9 }}>
-              An OTP has been sent to <strong>{emailForReset}</strong>.
+            <h2 className="login-title">Verify OTP</h2>
+            {error && <div className="error-msg">⚠️ {error}</div>}
+            {message && <div className="success-msg">✓ {message}</div>}
+            <p style={{ fontSize: 13, textAlign: 'center', marginBottom: 20, opacity: 0.85, lineHeight: 1.6 }}>
+              A 6-digit code was sent to<br/><strong>{emailForReset}</strong>
             </p>
             <form onSubmit={handleVerifyOtp}>
               <div className="input-group">
-                <input type="text" placeholder="6-digit OTP" maxLength="6" value={otpValue} onChange={(e) => setOtpValue(e.target.value)} required />
+                <input 
+                  type="text" 
+                  placeholder="Enter 6-digit OTP" 
+                  maxLength="6" 
+                  value={otpValue} 
+                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g,''))} 
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  style={{ textAlign: 'center', letterSpacing: '0.3em', fontSize: '20px' }}
+                />
               </div>
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify OTP'}
+              <button type="submit" className="submit-btn" disabled={loading || otpValue.length < 6}>
+                {loading ? <><span className="spinner"/>Verifying...</> : 'Verify OTP'}
               </button>
-              <div style={{ textAlign: 'center', marginTop: '15px' }}>
+              <div style={{ textAlign: 'center', marginTop: '14px' }}>
                 <button 
                   type="button" 
-                  onClick={handleForgotPassword} 
+                  onClick={handleForgotPassword}
                   disabled={loading || resendCooldown > 0} 
-                  style={{ background: 'transparent', border: 'none', color: resendCooldown > 0 ? 'rgba(255,255,255,0.5)' : '#fff', cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                  style={{ 
+                    background: 'transparent', border: 'none', 
+                    color: resendCooldown > 0 ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', 
+                    cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer', 
+                    fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                    textDecoration: resendCooldown > 0 ? 'none' : 'underline'
+                  }}
                 >
                   {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                 </button>
               </div>
-              <a className="back-link" onClick={() => setView('forgot')}>Change Email</a>
+              <button type="button" className="back-link" onClick={() => { resetStates(); setView('forgot'); }}>← Change Email</button>
             </form>
           </>
         )}
 
         {view === 'reset' && (
           <>
-            <h2>New Password</h2>
-            {error && <div className="error-msg">{error}</div>}
+            <h2 className="login-title">New Password</h2>
+            {error && <div className="error-msg">⚠️ {error}</div>}
+            {message && <div className="success-msg">✓ {message}</div>}
             <form onSubmit={handleResetPassword}>
-              <div className="input-group">
-                <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+              <div className="input-group has-eye">
+                <input 
+                  type={showNewPassword ? 'text' : 'password'} 
+                  placeholder="New Password (min. 6 chars)" 
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  required 
+                  autoComplete="new-password"
+                />
+                <button type="button" className="eye-toggle" onClick={() => setShowNewPassword(p => !p)} aria-label="Toggle password">
+                  <EyeIcon show={showNewPassword} />
+                </button>
               </div>
-              <div className="input-group">
-                <input type="password" placeholder="Confirm New Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+              <div className="input-group has-eye">
+                <input 
+                  type={showConfirmPassword ? 'text' : 'password'} 
+                  placeholder="Confirm New Password" 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                  required 
+                  autoComplete="new-password"
+                />
+                <button type="button" className="eye-toggle" onClick={() => setShowConfirmPassword(p => !p)} aria-label="Toggle password">
+                  <EyeIcon show={showConfirmPassword} />
+                </button>
               </div>
-              <button type="submit" className="submit-btn" disabled={loading}>
-                {loading ? 'Updating Password...' : 'Update Password'}
-              </button>
-            </form>
-          </>
-        )}
-
-      </div>
-    </div>
-  );
-};
-
-export default LoginPage;
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <div style={{ fontSize: 12, color: '#ff8a80', marginTop: -10, marginBottom: 10 }}>Passwords 
