@@ -47,16 +47,37 @@ app = FastAPI(
 
 pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# ── CORS ─────────────────────────────────────────────────────────────────────
+# allow_credentials=True requires EXACT origins (not "*").
+# We always add the wildcard fallback list so local dev + Vercel both work.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
 
-# FIX 2: Added allow_credentials=True — required when frontend sends JWT Authorization headers
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if _raw_origins and _raw_origins != "*":
+    # Specific origins provided — strip whitespace around each
+    ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in _raw_origins.split(",") if o.strip()]
+else:
+    # No specific origins set — allow everything (open API)
+    ALLOWED_ORIGINS = ["*"]
+
+# "allow_credentials + wildcard" is illegal → use allow_origin_regex instead
+if ALLOWED_ORIGINS == ["*"]:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r".*",   # matches all origins, compatible with credentials
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+logger.info(f"CORS origins: {ALLOWED_ORIGINS}")
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
