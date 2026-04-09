@@ -152,7 +152,7 @@ def _send_via_resend(target_email: str, otp: str, from_name: str) -> None:
     if not api_key:
         raise RuntimeError("RESEND_API_KEY not set")
 
-    from_email = os.getenv("RESEND_FROM_EMAIL", f"noreply@geniebuilder.app").strip()
+    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev").strip()
 
     payload = {
         "from": f"{from_name} <{from_email}>",
@@ -170,7 +170,14 @@ def _send_via_resend(target_email: str, otp: str, from_name: str) -> None:
     )
 
     if resp.status_code not in (200, 201):
-        body = resp.text[:300]
+        body = resp.text[:400]
+        if resp.status_code == 403:
+            raise RuntimeError(
+                f"Resend API key is invalid or domain not verified. "
+                f"Check your RESEND_API_KEY in Render → Environment. "
+                f"If using a custom domain in RESEND_FROM_EMAIL, verify it at resend.com/domains first. "
+                f"Or leave RESEND_FROM_EMAIL blank to use the safe sandbox address. Raw: {body}"
+            )
         raise RuntimeError(f"Resend API error {resp.status_code}: {body}")
 
     logger.info(f"✅ OTP email sent to {target_email} via Resend API")
@@ -378,13 +385,10 @@ async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTask
         send_otp_email(body.email, otp)
     except RuntimeError as exc:
         otp_collection.delete_one({"email": body.email})
-        logger.error(f"OTP not delivered to {body.email}: {exc}")
+        logger.error(f"OTP email failed for {body.email}: {exc}")
         raise HTTPException(
             status_code=503,
-            detail=(
-                "Email service is not configured on the server. "
-                "Please contact support. (Admin: set SMTP_USER and SMTP_PASS in Render environment variables)"
-            ),
+            detail=str(exc)
         )
     return {"message": "OTP sent! Check your inbox (and spam folder)."}
 
