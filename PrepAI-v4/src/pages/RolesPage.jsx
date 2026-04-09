@@ -39,7 +39,9 @@ export default function RolesPage({ role, setRole, onStart, onHome, onProfile, o
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', position: 'relative', overflow: 'hidden' }}>
+    <div className="page-wrapper" style={{ overflow: 'hidden' }}>
+      <div className="bg-orb bg-orb-1" style={{ opacity:0.5 }} />
+      <div className="bg-orb bg-orb-2" style={{ opacity:0.4 }} />
       {/* Background gradient */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
@@ -49,7 +51,7 @@ export default function RolesPage({ role, setRole, onStart, onHome, onProfile, o
       }} />
 
       {/* Nav */}
-      <nav className="resp-nav" style={{
+      <nav className="resp-nav nav-enter" style={{
         position: 'sticky', top: 0, zIndex: 100,
         background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
         padding: '0 32px', display: 'flex', alignItems: 'center',
@@ -76,7 +78,7 @@ export default function RolesPage({ role, setRole, onStart, onHome, onProfile, o
         </div>
       </nav>
 
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '48px 24px', position: 'relative', zIndex: 1, animation: 'fadeUp .5s ease' }}>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '48px 24px', position: 'relative', zIndex: 1, animation: 'pageReveal .6s cubic-bezier(0.22,1,0.36,1) both' }}>
         <h1 style={{
           fontFamily: 'var(--font-display)', fontSize: 36,
           fontWeight: 700, marginBottom: 12, textAlign: 'center', color: 'var(--text-primary)'
@@ -139,15 +141,15 @@ export default function RolesPage({ role, setRole, onStart, onHome, onProfile, o
                 display: 'inline-block', fontWeight: 600
               }}>{cat.toUpperCase()}</div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              <div className="stagger-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
                 {roles.map(r => (
-                  <div key={r.key} className={`role-card ${role === r.key ? 'role-active' : ''}`}
+                  <div key={r.key} className={`role-card anim-flip-in card-hover-glow ${role === r.key ? 'role-active' : ''}`}
                     onClick={() => setRole(r.key)}
                     style={{
                       background: role === r.key ? 'var(--accent-a-dim)' : 'var(--bg-card)',
                       border: `1.5px solid ${role === r.key ? 'var(--accent-a)' : 'var(--border)'}`,
                       borderRadius: 14, padding: '20px 18px', display: 'flex', alignItems: 'center', gap: 14,
-                      cursor: 'pointer', transition: 'all 0.2s',
+                      cursor: 'pointer', transition: 'all 0.25s',
                     }}>
                     <div style={{ fontSize: 24 }}>{r.icon}</div>
                     <div>
