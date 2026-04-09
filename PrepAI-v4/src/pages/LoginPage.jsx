@@ -421,4 +421,145 @@ const LoginPage = ({ onLogin, onSignup }) => {
               {error && <div className="alert alert-error"><span className="alert-icon">⚠</span>{error}</div>}
               {message && <div className="alert alert-success"><span className="alert-icon">✓</span>{message}</div>}
               <form onSubmit={handleSubmit}>
-         
+                <FloatInput type="email" label="Email Address" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+                <FloatInput type="password" label="Password" value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" eye showEye={showPw} onToggleEye={() => setShowPw(p => !p)} />
+                <div className="check-row">
+                  <label className="check-label">
+                    <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+                    Remember me
+                  </label>
+                  <button type="button" className="btn-ghost" onClick={() => { setEmailForReset(email); goTo('forgot'); }}>
+                    Forgot password?
+                  </button>
+                </div>
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? <><span className="spin" />Signing in…</> : 'Sign In →'}
+                </button>
+              </form>
+              <div className="register-row">
+                New here?<button type="button" onClick={onSignup}>Create account</button>
+              </div>
+            </>
+          )}
+
+          {/* ─── FORGOT PASSWORD ──────────────────────────────── */}
+          {view === 'forgot' && (
+            <>
+              <StepBar current={0} />
+              <div className="lp-title">Reset password</div>
+              <div className="lp-sub">We'll send a 6-digit code to your email</div>
+              {error && (
+                <>
+                  <div className="alert alert-error"><span className="alert-icon">⚠</span>{error}</div>
+                  {error.toLowerCase().includes('smtp') || error.toLowerCase().includes('email service') || error.toLowerCase().includes('not configured') ? (
+                    <div className="admin-hint">
+                      🔧 <strong>Admin:</strong> Set <code>SMTP_USER</code> and <code>SMTP_PASS</code> (Gmail App Password) in your Render environment variables. Generate at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>myaccount.google.com/apppasswords</a>
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <form onSubmit={handleForgotPassword}>
+                <FloatInput type="email" label="Your Email Address" value={emailForReset} onChange={e => setEmailForReset(e.target.value)} required autoComplete="email" />
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? <><span className="spin" />Sending code…</> : 'Send OTP →'}
+                </button>
+              </form>
+              <div className="back-row">
+                <button type="button" className="btn-ghost" onClick={() => goTo('login')}>← Back to login</button>
+              </div>
+            </>
+          )}
+
+          {/* ─── OTP ─────────────────────────────────────────── */}
+          {view === 'otp' && (
+            <>
+              <StepBar current={1} />
+              <div className="lp-title">Enter code</div>
+              <div className="lp-sub">Sent to <strong style={{ color: 'rgba(255,255,255,0.75)' }}>{emailForReset}</strong><br/>Check spam if not received</div>
+              {error && <div className="alert alert-error"><span className="alert-icon">⚠</span>{error}</div>}
+              {message && <div className="alert alert-success"><span className="alert-icon">✓</span>{message}</div>}
+              <form onSubmit={handleVerifyOtp}>
+                <OtpBoxes value={otpValue} onChange={setOtpValue} />
+                <button type="submit" className="btn-primary" disabled={loading || otpValue.length < 6}>
+                  {loading ? <><span className="spin" />Verifying…</> : 'Verify Code →'}
+                </button>
+              </form>
+              <div className="resend-row">
+                <button type="button" className="resend-btn" onClick={handleForgotPassword} disabled={loading || resendCooldown > 0}>
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : '↺ Resend OTP'}
+                </button>
+              </div>
+              <div className="back-row">
+                <button type="button" className="btn-ghost" onClick={() => goTo('forgot')}>← Change email</button>
+              </div>
+            </>
+          )}
+
+          {/* ─── RESET PASSWORD ──────────────────────────────── */}
+          {view === 'reset' && (
+            <>
+              <StepBar current={2} />
+              <div className="lp-title">New password</div>
+              <div className="lp-sub">Make it strong and memorable</div>
+              {error && <div className="alert alert-error"><span className="alert-icon">⚠</span>{error}</div>}
+              {message && <div className="alert alert-success"><span className="alert-icon">✓</span>{message}</div>}
+              <form onSubmit={handleResetPassword}>
+                <FloatInput type="password" label="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required autoComplete="new-password" eye showEye={showNewPw} onToggleEye={() => setShowNewPw(p => !p)} />
+                <PwStrength pw={newPassword} />
+                <FloatInput type="password" label="Confirm Password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required autoComplete="new-password" eye showEye={showConfPw} onToggleEye={() => setShowConfPw(p => !p)} />
+                {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                  <div style={{ fontSize: 12, color: '#fca5a5', marginTop: -10, marginBottom: 14 }}>✕ Passwords don't match</div>
+                )}
+                <button type="submit" className="btn-primary" disabled={loading || !newPassword || newPassword !== confirmPassword}>
+                  {loading ? <><span className="spin" />Updating…</> : 'Update Password →'}
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+/* ─── Step bar component ──────────────────────────────────────────── */
+const StepBar = ({ current }) => {
+  const steps = ['Email', 'Verify', 'Reset'];
+  return (
+    <div className="step-bar" style={{ marginBottom: 20 }}>
+      {steps.map((s, i) => (
+        <div className="step-item" key={s}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div className={`step-circle ${i < current ? 'done' : i === current ? 'active' : 'pending'}`}>
+              {i < current ? '✓' : i + 1}
+            </div>
+            <div className="step-label">{s}</div>
+          </div>
+          {i < steps.length - 1 && <div className={`step-line ${i < current ? 'done' : ''}`} style={{ marginBottom: 18 }} />}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ─── Password strength indicator ─────────────────────────────────── */
+const PwStrength = ({ pw }) => {
+  if (!pw) return null;
+  const score = [pw.length >= 8, /[A-Z]/.test(pw), /[0-9]/.test(pw), /[^A-Za-z0-9]/.test(pw)].filter(Boolean).length;
+  const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
+  const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+  return (
+    <div style={{ marginTop: -10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: i < score ? colors[score - 1] : 'rgba(255,255,255,0.1)', transition: 'all 0.3s' }} />
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: colors[score - 1] || 'rgba(255,255,255,0.3)', textAlign: 'right' }}>
+        {score > 0 ? labels[score - 1] : ''}
+      </div>
+    </div>
+  );
+};
+
+export default LoginPage;
