@@ -19,6 +19,7 @@ from pydantic import BaseModel
 import random
 import smtplib
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -102,34 +103,205 @@ def _require_db():
     if client is None:
         raise HTTPException(503, "MongoDB is not connected. Check your MONGO_URI environment variable.")
 
-def send_otp_email(target_email: str, otp: str):
-    """Send OTP via SMTP. Configure SMTP_HOST/PORT/USER/PASS in environment variables."""
-    smtp_host = os.getenv("SMTP_HOST")
-    if not smtp_host:
-        logger.warning("SMTP_HOST missing. Email not sent.")
-        return
+def _build_otp_html(otp: str) -> str:
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f1fb;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1fb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(155,142,199,0.15);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#2A1F3D 0%,#9B8EC7 100%);padding:36px 40px;text-align:center;">
+            <div style="font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-1px;">GenieBuilder</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px;letter-spacing:2px;text-transform:uppercase;">Password Reset</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:40px 40px 32px;">
+            <p style="font-size:16px;color:#2A1F3D;margin:0 0 8px;font-weight:600;">Hi there 👋</p>
+            <p style="font-size:14px;color:#5A4E6E;margin:0 0 28px;line-height:1.7;">
+              We received a request to reset your GenieBuilder password.<br>
+              Use the OTP below — it is valid for <strong>10 minutes</strong>.
+            </p>
+            <div style="background:linear-gradient(135deg,#f4f1fb,#ede8f8);border-radius:16px;padding:28px;text-align:center;margin-bottom:28px;border:2px dashed #9B8EC7;">
+              <div style="font-size:11px;color:#9B8EC7;letter-spacing:3px;text-transform:uppercase;margin-bottom:12px;font-weight:600;">Your One-Time Password</div>
+              <div style="font-size:44px;font-weight:800;color:#2A1F3D;letter-spacing:12px;font-family:'Courier New',monospace;">{otp}</div>
+            </div>
+            <p style="font-size:13px;color:#9488A8;line-height:1.7;margin:0;">
+              If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f9f7ff;padding:20px 40px;border-top:1px solid #ede8f8;text-align:center;">
+            <p style="font-size:11px;color:#b0a8c8;margin:0;">GenieBuilder · AI-Powered Interview Prep</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
 
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER", "")
-    smtp_pass = os.getenv("SMTP_PASS", "")
+
+def _send_via_resend(target_email: str, otp: str, from_name: str) -> None:
+    """Send using Resend HTTP API (recommended for Render — no SMTP port issues)."""
+    import httpx
+    api_key = os.getenv("RESEND_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("RESEND_API_KEY not set")
+
+    from_email = os.getenv("RESEND_FROM_EMAIL", f"noreply@geniebuilder.app").strip()
+
+    payload = {
+        "from": f"{from_name} <{from_email}>",
+        "to": [target_email],
+        "subject": "Your GenieBuilder Password Reset OTP",
+        "html": _build_otp_html(otp),
+        "text": f"Your GenieBuilder OTP is: {otp}\nIt expires in 10 minutes.\n\nIf you didn't request this, ignore this email.",
+    }
+
+    resp = httpx.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=15,
+    )
+
+    if resp.status_code not in (200, 201):
+        body = resp.text[:300]
+        raise RuntimeError(f"Resend API error {resp.status_code}: {body}")
+
+    logger.info(f"✅ OTP email sent to {target_email} via Resend API")
+
+
+def _send_via_smtp(target_email: str, otp: str, from_name: str) -> None:
+    """Send using SMTP (Gmail or any SMTP provider)."""
+    import ssl as _ssl
+
+    smtp_host     = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port_str = os.getenv("SMTP_PORT", "587")
+    smtp_user     = os.getenv("SMTP_USER", "").strip()
+    smtp_pass     = os.getenv("SMTP_PASS", "").strip()
 
     if not smtp_user or not smtp_pass:
-        logger.warning(f"[DEMO MODE] OTP for {target_email}: {otp}")
-        return
-
-    msg = MIMEText(f"Your OTP is: {otp}. It expires in 10 minutes.")
-    msg["Subject"] = "Your Password Reset OTP"
-    msg["From"] = smtp_user
-    msg["To"] = target_email
+        raise RuntimeError(
+            "SMTP credentials missing. Set SMTP_USER (Gmail address) and "
+            "SMTP_PASS (16-char App Password from https://myaccount.google.com/apppasswords) "
+            "in Render → Environment."
+        )
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
-            logger.info(f"OTP email sent to {target_email}")
-    except Exception as e:
-        logger.error(f"Failed to send OTP email to {target_email}: {e}")
+        smtp_port = int(smtp_port_str)
+    except ValueError:
+        smtp_port = 587
+
+    html_body  = _build_otp_html(otp)
+    plain_body = (
+        f"Your GenieBuilder OTP is: {otp}\n"
+        "It expires in 10 minutes.\n\n"
+        "If you didn't request this, ignore this email."
+    )
+
+    email_msg = MIMEMultipart("alternative")
+    email_msg["Subject"] = "Your GenieBuilder Password Reset OTP"
+    email_msg["From"]    = f"{from_name} <{smtp_user}>"
+    email_msg["To"]      = target_email
+    email_msg.attach(MIMEText(plain_body, "plain"))
+    email_msg.attach(MIMEText(html_body, "html"))
+
+    sent = False
+
+    # Attempt 1 – STARTTLS (port 587, works on most providers)
+    if smtp_port != 465:
+        try:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(smtp_user, smtp_pass)
+                server.send_message(email_msg)
+                sent = True
+                logger.info(f"✅ OTP sent to {target_email} via STARTTLS:{smtp_port}")
+        except smtplib.SMTPAuthenticationError as exc:
+            raise RuntimeError(
+                f"Gmail login failed for '{smtp_user}'. "
+                "Use a 16-char App Password (not your normal password). "
+                "Generate at https://myaccount.google.com/apppasswords"
+            ) from exc
+        except Exception as exc:
+            logger.warning(f"STARTTLS failed ({exc}), trying SSL:465…")
+
+    # Attempt 2 – SSL (port 465, fallback)
+    if not sent:
+        try:
+            ctx = _ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, 465, timeout=20, context=ctx) as server:
+                server.login(smtp_user, smtp_pass)
+                server.send_message(email_msg)
+                sent = True
+                logger.info(f"✅ OTP sent to {target_email} via SSL:465")
+        except smtplib.SMTPAuthenticationError as exc:
+            raise RuntimeError(
+                f"Gmail login failed for '{smtp_user}'. "
+                "Use a 16-char App Password. "
+                "Generate at https://myaccount.google.com/apppasswords"
+            ) from exc
+        except Exception as exc:
+            raise RuntimeError(
+                f"SMTP failed on both port {smtp_port} and 465: {exc}. "
+                "On Render free tier, try using RESEND_API_KEY instead — "
+                "free at https://resend.com (3000 emails/month)."
+            ) from exc
+
+
+def send_otp_email(target_email: str, otp: str):
+    """
+    Send OTP email. Tries Resend API first (recommended for Render hosting),
+    then falls back to SMTP (Gmail).
+
+    ─── OPTION A — Resend API (recommended, avoids SMTP port blocks) ────────
+    1. Sign up free at https://resend.com  (3,000 emails/month free)
+    2. Add a verified domain OR use the sandbox (only sends to your own email)
+    3. In Render → Environment add:
+         RESEND_API_KEY   = re_xxxxxxxxxxxx
+         RESEND_FROM_EMAIL = noreply@yourdomain.com   (or omit to use default)
+
+    ─── OPTION B — Gmail SMTP ──────────────────────────────────────────────
+    1. Enable 2-Step Verification on your Google account
+    2. Generate an App Password: https://myaccount.google.com/apppasswords
+    3. In Render → Environment add:
+         SMTP_USER = your-email@gmail.com
+         SMTP_PASS = xxxx xxxx xxxx xxxx   (16-char App Password, spaces optional)
+    """
+    from_name = os.getenv("SMTP_FROM_NAME", os.getenv("EMAIL_FROM_NAME", "GenieBuilder"))
+
+    # ── Try Resend first (HTTP-based, works on all Render plans) ────────────
+    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    if resend_key:
+        try:
+            _send_via_resend(target_email, otp, from_name)
+            return
+        except RuntimeError as exc:
+            logger.warning(f"Resend failed: {exc}. Falling back to SMTP…")
+
+    # ── Fall back to SMTP ────────────────────────────────────────────────────
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+    if smtp_user and smtp_pass:
+        _send_via_smtp(target_email, otp, from_name)
+        return
+
+    # ── Neither configured ───────────────────────────────────────────────────
+    msg = (
+        "Email is not configured on this server. "
+        "Add RESEND_API_KEY (recommended) or SMTP_USER + SMTP_PASS "
+        "in Render → your service → Environment. "
+        "See: https://resend.com for a free API key."
+    )
+    logger.error(f"❌ {msg} | OTP for {target_email}: {otp}")
+    raise RuntimeError(msg)
 
 # ─── Auth Routes ──────────────────────────────────────────────────────────────
 
@@ -201,8 +373,20 @@ async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTask
         upsert=True,
     )
 
-    background_tasks.add_task(send_otp_email, body.email, otp)
-    return {"message": "If this email is registered, you will receive an OTP."}
+    # Send synchronously so SMTP errors surface to the user immediately
+    try:
+        send_otp_email(body.email, otp)
+    except RuntimeError as exc:
+        otp_collection.delete_one({"email": body.email})
+        logger.error(f"OTP not delivered to {body.email}: {exc}")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Email service is not configured on the server. "
+                "Please contact support. (Admin: set SMTP_USER and SMTP_PASS in Render environment variables)"
+            ),
+        )
+    return {"message": "OTP sent! Check your inbox (and spam folder)."}
 
 
 @app.post("/api/verify-otp")
@@ -236,6 +420,41 @@ def reset_password(body: ResetPassword):
     users_collection.update_one({"email": body.email}, {"$set": {"password": hashed_password}})
     otp_collection.delete_one({"email": body.email})
     return {"message": "Password updated successfully."}
+
+
+@app.get("/api/test-email")
+def test_email_config():
+    """Diagnostic — checks email config. Visit /api/test-email in browser."""
+    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    smtp_user  = os.getenv("SMTP_USER", "").strip()
+    smtp_pass  = os.getenv("SMTP_PASS", "").strip()
+    if resend_key:
+        return {"status": "configured", "method": "Resend API",
+                "key_prefix": resend_key[:8] + "…",
+                "from_email": os.getenv("RESEND_FROM_EMAIL", "noreply@geniebuilder.app"),
+                "note": "Resend API key is set. Emails should work."}
+    if smtp_user and smtp_pass:
+        return {"status": "configured", "method": "SMTP",
+                "smtp_host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
+                "smtp_user": smtp_user,
+                "note": "SMTP credentials set."}
+    return {"status": "not_configured",
+            "recommended": "Add RESEND_API_KEY in Render → Environment. Get free key at https://resend.com",
+            "alternative": "Or add SMTP_USER + SMTP_PASS (Gmail App Password from https://myaccount.google.com/apppasswords)"}
+
+
+@app.post("/api/test-email-send")
+async def test_email_send(request: Request):
+    """Actually send a test OTP to verify config. POST {"email": "you@example.com"}"""
+    body = await request.json()
+    target = body.get("email", "").strip()
+    if not target:
+        raise HTTPException(400, "email field required")
+    try:
+        send_otp_email(target, "123456")
+        return {"status": "sent", "to": target}
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc))
 
 # ─── Profile Routes ───────────────────────────────────────────────────────────
 
