@@ -510,3 +510,33 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Browse All Roles button (standalone, no !important conflicts) ─────────── */
+.browse-all-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: transparent;
+  border: 1.5px solid var(--accent-a);
+  color: var(--text-primary);
+  border-radius: 12px; padding: 14px 32px;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body);
+  box-shadow: 0 4px 24px var(--glow-a);
+  transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+  position: relative; overflow: hidden;
+}
+.browse-all-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--accent-a-dim);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.browse-all-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 36px var(--glow-a);
+  border-color: var(--accent-a);
+  color: var(--accent-a);
+}
+.browse-all-btn:hover::before { opacity: 1; }
+.browse-all-btn:hover span { transform: translateX(4px); }
+.browse-all-btn:active { transform: translateY(-1px); }
