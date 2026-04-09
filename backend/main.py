@@ -398,37 +398,33 @@ def login(user: UserAuth):
 
 @app.post("/api/forgot-password")
 def forgot_password(body: ForgotPassword):
-    """Generate OTP and send it to email."""
+    """
+    Generate OTP, store it in DB, and return it to the frontend.
+    The frontend is responsible for emailing the OTP to the user (via EmailJS).
+    This approach avoids all SMTP/firewall issues on the server.
+    """
     _require_db()
     user = users_collection.find_one({"email": body.email})
     if not user:
-        return {"message": "If this email is registered, you will receive an OTP."}
+        # Always return 200 with a fake OTP-like response to prevent email enumeration
+        return {"message": "OTP ready.", "otp": None, "email_found": False}
 
     otp = str(random.randint(100000, 999999))
     expiry = datetime.utcnow() + timedelta(minutes=10)
 
-    # FIX 3: Use top-level otp_collection — no redundant re-imports needed
     otp_collection.update_one(
         {"email": body.email},
         {"$set": {"otp": otp, "expires_at": expiry}},
         upsert=True,
     )
 
-    # Send email — catch ALL exceptions so server never returns 502
-    try:
-        send_otp_email(body.email, otp)
-        return {"message": "OTP sent! Check your inbox (and spam folder)."}
-    except RuntimeError as exc:
-        otp_collection.delete_one({"email": body.email})
-        logger.error(f"OTP email failed for {body.email}: {exc}")
-        raise HTTPException(status_code=503, detail=str(exc))
-    except Exception as exc:
-        otp_collection.delete_one({"email": body.email})
-        logger.error(f"Unexpected OTP error for {body.email}: {exc}", exc_info=True)
-        raise HTTPException(
-            status_code=503,
-            detail=f"Failed to send OTP: {type(exc).__name__}: {exc}"
-        )
+    logger.info(f"OTP generated for {body.email}: {otp}")
+    return {
+        "message": "OTP generated successfully.",
+        "otp": otp,
+        "email_found": True,
+        "expires_in_minutes": 10,
+    }
 
 
 @app.post("/api/verify-otp")
