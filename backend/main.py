@@ -184,25 +184,18 @@ def _send_via_resend(target_email: str, otp: str, from_name: str) -> None:
 
 
 def _send_via_smtp(target_email: str, otp: str, from_name: str) -> None:
-    """Send using SMTP (Gmail or any SMTP provider)."""
+    """Send OTP via Gmail SMTP with App Password."""
     import ssl as _ssl
 
-    smtp_host     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    smtp_port_str = os.getenv("SMTP_PORT", "587")
-    smtp_user     = os.getenv("SMTP_USER", "").strip()
-    smtp_pass     = os.getenv("SMTP_PASS", "").strip()
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip().replace(" ", "")  # strip spaces from App Password
 
     if not smtp_user or not smtp_pass:
         raise RuntimeError(
-            "SMTP credentials missing. Set SMTP_USER (Gmail address) and "
-            "SMTP_PASS (16-char App Password from https://myaccount.google.com/apppasswords) "
+            "SMTP not configured. Set SMTP_USER (Gmail) + SMTP_PASS (16-char App Password) "
             "in Render → Environment."
         )
-
-    try:
-        smtp_port = int(smtp_port_str)
-    except ValueError:
-        smtp_port = 587
 
     html_body  = _build_otp_html(otp)
     plain_body = (
@@ -218,94 +211,114 @@ def _send_via_smtp(target_email: str, otp: str, from_name: str) -> None:
     email_msg.attach(MIMEText(plain_body, "plain"))
     email_msg.attach(MIMEText(html_body, "html"))
 
-    sent = False
+    last_error = None
 
-    # Attempt 1 – STARTTLS (port 587, works on most providers)
-    if smtp_port != 465:
-        try:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(smtp_user, smtp_pass)
-                server.send_message(email_msg)
-                sent = True
-                logger.info(f"✅ OTP sent to {target_email} via STARTTLS:{smtp_port}")
-        except smtplib.SMTPAuthenticationError as exc:
-            raise RuntimeError(
-                f"Gmail login failed for '{smtp_user}'. "
-                "Use a 16-char App Password (not your normal password). "
-                "Generate at https://myaccount.google.com/apppasswords"
-            ) from exc
-        except Exception as exc:
-            logger.warning(f"STARTTLS failed ({exc}), trying SSL:465…")
+    # Attempt 1 — STARTTLS on port 587 (Gmail primary)
+    try:
+        logger.info(f"Trying SMTP STARTTLS {smtp_host}:587 …")
+        with smtplib.SMTP(smtp_host, 587, timeout=12) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, target_email, email_msg.as_string())
+            logger.info(f"✅ OTP sent to {target_email} via STARTTLS:587")
+            return
+    except smtplib.SMTPAuthenticationError:
+        raise RuntimeError(
+            f"Gmail login failed for '{smtp_user}'. "
+            "You must use a 16-character App Password, NOT your Gmail login password. "
+            "Steps: 1) Enable 2-Step Verification on Google account  "
+            "2) Go to https://myaccount.google.com/apppasswords  "
+            "3) Create App Password → copy the 16 chars → paste into SMTP_PASS in Render"
+        )
+    except Exception as exc:
+        last_error = exc
+        logger.warning(f"STARTTLS:587 failed: {exc} — trying SSL:465…")
 
-    # Attempt 2 – SSL (port 465, fallback)
-    if not sent:
-        try:
-            ctx = _ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, 465, timeout=8, context=ctx) as server:
-                server.login(smtp_user, smtp_pass)
-                server.send_message(email_msg)
-                sent = True
-                logger.info(f"✅ OTP sent to {target_email} via SSL:465")
-        except smtplib.SMTPAuthenticationError as exc:
-            raise RuntimeError(
-                f"Gmail login failed for '{smtp_user}'. "
-                "Use a 16-char App Password. "
-                "Generate at https://myaccount.google.com/apppasswords"
-            ) from exc
-        except Exception as exc:
-            raise RuntimeError(
-                f"SMTP failed on both port {smtp_port} and 465: {exc}. "
-                "On Render free tier, try using RESEND_API_KEY instead — "
-                "free at https://resend.com (3000 emails/month)."
-            ) from exc
+    # Attempt 2 — SSL on port 465 (fallback)
+    try:
+        logger.info(f"Trying SMTP SSL {smtp_host}:465 …")
+        ctx = _ssl.create_default_context()
+        with smtplib.SMTP_SSL(smtp_host, 465, timeout=12, context=ctx) as server:
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, target_email, email_msg.as_string())
+            logger.info(f"✅ OTP sent to {target_email} via SSL:465")
+            return
+    except smtplib.SMTPAuthenticationError:
+        raise RuntimeError(
+            f"Gmail login failed for '{smtp_user}'. "
+            "Use a 16-char App Password from https://myaccount.google.com/apppasswords"
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"SMTP failed on both 587 and 465. Last error: {exc}. "
+            f"First error: {last_error}. "
+            "Check SMTP_HOST, SMTP_USER and SMTP_PASS in Render Environment."
+        ) from exc
 
 
 def send_otp_email(target_email: str, otp: str):
     """
-    Send OTP email. Tries Resend API first (recommended for Render hosting),
-    then falls back to SMTP (Gmail).
+    Send OTP — tries SMTP first (Gmail), then Resend API as fallback.
 
-    ─── OPTION A — Resend API (recommended, avoids SMTP port blocks) ────────
-    1. Sign up free at https://resend.com  (3,000 emails/month free)
-    2. Add a verified domain OR use the sandbox (only sends to your own email)
-    3. In Render → Environment add:
-         RESEND_API_KEY   = re_xxxxxxxxxxxx
-         RESEND_FROM_EMAIL = noreply@yourdomain.com   (or omit to use default)
+    IMPORTANT: onboarding@resend.dev is Resend sandbox — only delivers to
+    your own Resend account email, NOT to real users. Always use SMTP or
+    a verified Resend domain for production.
 
-    ─── OPTION B — Gmail SMTP ──────────────────────────────────────────────
-    1. Enable 2-Step Verification on your Google account
-    2. Generate an App Password: https://myaccount.google.com/apppasswords
-    3. In Render → Environment add:
-         SMTP_USER = your-email@gmail.com
-         SMTP_PASS = xxxx xxxx xxxx xxxx   (16-char App Password, spaces optional)
+    Gmail SMTP setup (Render allows all outbound ports):
+      1. Enable 2-Step Verification on your Google account
+      2. Go to https://myaccount.google.com/apppasswords
+      3. Create an App Password for "Mail"
+      4. In Render → Environment add:
+           SMTP_USER = your-gmail@gmail.com
+           SMTP_PASS = xxxx xxxx xxxx xxxx   (16-char, spaces ok)
     """
     from_name = os.getenv("SMTP_FROM_NAME", os.getenv("EMAIL_FROM_NAME", "GenieBuilder"))
-
-    # ── Try Resend first (HTTP-based, works on all Render plans) ────────────
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
     resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    resend_from = os.getenv("RESEND_FROM_EMAIL", "").strip()
+
+    # ── SMTP first — works with Gmail App Password on Render ────────────────
+    if smtp_user and smtp_pass:
+        logger.info(f"Attempting SMTP send to {target_email} via {smtp_user}")
+        try:
+            _send_via_smtp(target_email, otp, from_name)
+            return
+        except RuntimeError as exc:
+            logger.warning(f"SMTP failed: {exc}")
+            # fall through to Resend
+
+    # ── Resend — only useful if you have a verified domain (NOT sandbox) ────
+    # onboarding@resend.dev only delivers to your Resend account email!
     if resend_key:
+        is_sandbox = (not resend_from) or resend_from == "onboarding@resend.dev"
+        if is_sandbox:
+            logger.error(
+                "Resend is set to sandbox mode (onboarding@resend.dev). "
+                "This ONLY delivers to your Resend account email, NOT to users. "
+                "Configure SMTP_USER + SMTP_PASS (Gmail App Password) instead."
+            )
+            raise RuntimeError(
+                "Email not configured correctly. "
+                "Please contact the site admin. "
+                "(Admin: set SMTP_USER and SMTP_PASS in Render → Environment. "
+                "Use a Gmail App Password from https://myaccount.google.com/apppasswords)"
+            )
+        # Has a verified custom domain — Resend will work for all users
         try:
             _send_via_resend(target_email, otp, from_name)
             return
         except RuntimeError as exc:
-            logger.warning(f"Resend failed: {exc}. Falling back to SMTP…")
+            raise  # surface the real error
 
-    # ── Fall back to SMTP ────────────────────────────────────────────────────
-    smtp_user = os.getenv("SMTP_USER", "").strip()
-    smtp_pass = os.getenv("SMTP_PASS", "").strip()
-    if smtp_user and smtp_pass:
-        _send_via_smtp(target_email, otp, from_name)
-        return
-
-    # ── Neither configured ───────────────────────────────────────────────────
+    # ── Nothing configured ───────────────────────────────────────────────────
     msg = (
-        "Email is not configured on this server. "
-        "Add RESEND_API_KEY (recommended) or SMTP_USER + SMTP_PASS "
+        "Email delivery is not configured. "
+        "Admin: add SMTP_USER (Gmail) + SMTP_PASS (App Password) "
         "in Render → your service → Environment. "
-        "See: https://resend.com for a free API key."
+        "Generate App Password at https://myaccount.google.com/apppasswords"
     )
     logger.error(f"❌ {msg} | OTP for {target_email}: {otp}")
     raise RuntimeError(msg)
@@ -463,6 +476,67 @@ async def test_email_send(request: Request):
         return {"status": "sent", "to": target}
     except RuntimeError as exc:
         raise HTTPException(503, str(exc))
+
+
+@app.get("/api/check-email")
+def check_email_config():
+    """
+    Visit yourapp.onrender.com/api/check-email in browser to diagnose email setup.
+    Shows exactly what is configured and whether it will work.
+    """
+    smtp_user  = os.getenv("SMTP_USER", "").strip()
+    smtp_pass  = os.getenv("SMTP_PASS", "").strip()
+    smtp_host  = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    resend_key = os.getenv("RESEND_API_KEY", "").strip()
+    resend_from = os.getenv("RESEND_FROM_EMAIL", "").strip()
+
+    issues = []
+    working_method = None
+
+    if smtp_user and smtp_pass:
+        clean_pass = smtp_pass.replace(" ", "")
+        if len(clean_pass) != 16:
+            issues.append(
+                f"SMTP_PASS is {len(clean_pass)} chars (should be exactly 16). "
+                "Make sure you copied the full Gmail App Password."
+            )
+        else:
+            working_method = "SMTP"
+    else:
+        issues.append("SMTP_USER or SMTP_PASS is missing.")
+
+    if resend_key:
+        if not resend_from or resend_from == "onboarding@resend.dev":
+            issues.append(
+                "RESEND_FROM_EMAIL is 'onboarding@resend.dev' — this is Resend SANDBOX. "
+                "It ONLY delivers to your Resend account email, NOT to real users. "
+                "To fix: verify your domain at resend.com/domains and set RESEND_FROM_EMAIL "
+                "to noreply@yourdomain.com"
+            )
+        else:
+            working_method = "Resend API"
+
+    return {
+        "smtp_configured": bool(smtp_user and smtp_pass),
+        "smtp_user": smtp_user or "NOT SET",
+        "smtp_host": smtp_host,
+        "smtp_pass_length": len(smtp_pass.replace(" ", "")) if smtp_pass else 0,
+        "smtp_pass_ok": len(smtp_pass.replace(" ", "")) == 16 if smtp_pass else False,
+        "resend_configured": bool(resend_key),
+        "resend_from": resend_from or "NOT SET (defaults to onboarding@resend.dev sandbox)",
+        "resend_is_sandbox": (not resend_from) or resend_from == "onboarding@resend.dev",
+        "working_method": working_method,
+        "issues": issues,
+        "will_emails_reach_users": working_method is not None and len([i for i in issues if "SMTP_PASS" in i or "sandbox" in i.lower()]) == 0,
+        "fix_steps": (
+            "1. Go to https://myaccount.google.com/apppasswords "
+            "2. Sign in → Select app: Mail → Select device: Other → name it 'Render' "
+            "3. Copy the 16-character password shown "
+            "4. In Render → Environment: set SMTP_PASS = that 16-char password (no spaces needed) "
+            "5. Redeploy"
+        ) if not working_method else "Email is configured correctly!"
+    }
+
 
 # ─── Profile Routes ───────────────────────────────────────────────────────────
 
