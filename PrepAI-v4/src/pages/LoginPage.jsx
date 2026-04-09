@@ -451,9 +451,15 @@ const LoginPage = ({ onLogin, onSignup }) => {
               {error && (
                 <>
                   <div className="alert alert-error"><span className="alert-icon">⚠</span>{error}</div>
-                  {error.toLowerCase().includes('smtp') || error.toLowerCase().includes('email service') || error.toLowerCase().includes('not configured') ? (
+                  {(error.toLowerCase().includes('not configured') || error.toLowerCase().includes('smtp') || error.toLowerCase().includes('resend') || error.toLowerCase().includes('email') || error.includes('503')) ? (
                     <div className="admin-hint">
-                      🔧 <strong>Admin:</strong> Set <code>SMTP_USER</code> and <code>SMTP_PASS</code> (Gmail App Password) in your Render environment variables. Generate at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>myaccount.google.com/apppasswords</a>
+                      🔧 <strong>Email not set up on server.</strong><br/>
+                      <strong>Quick fix (2 min):</strong><br/>
+                      1. Sign up free at <a href="https://resend.com" target="_blank" rel="noreferrer" style={{ color: '#fbbf24' }}>resend.com</a><br/>
+                      2. Copy your API key (starts with <code>re_</code>)<br/>
+                      3. In <strong>Render → your service → Environment</strong> add:<br/>
+                      &nbsp;&nbsp;<code>RESEND_API_KEY</code> = <em>re_xxxxxxxxxxxx</em><br/>
+                      4. Redeploy — OTPs will arrive instantly ✓
                     </div>
                   ) : null}
                 </>
