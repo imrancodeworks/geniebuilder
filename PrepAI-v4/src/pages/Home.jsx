@@ -229,13 +229,8 @@ export default function Home({ role, setRole, onStart, onDashboard, onAbout, onB
 
         {/* ── Browse All Roles CTA ──────────────────────────────────────── */}
         <div className="anim-fade-up d-6" style={{ textAlign: 'center', marginBottom: 48 }}>
-          <button className="btn-primary btn-shine hover-lift" onClick={onBrowseRoles} style={{
-            background: 'var(--bg-surface)', border: '1px solid var(--accent-a)',
-            color: 'var(--text-primary)', borderRadius: 12, padding: '14px 32px',
-            fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)',
-            boxShadow: '0 8px 24px var(--glow-a)', display: 'inline-flex', alignItems: 'center', gap: 8,
-          }}>
-            Browse All 28 Roles <span>→</span>
+          <button onClick={onBrowseRoles} className="browse-all-btn">
+            Browse All 28 Roles <span style={{ display: 'inline-block', transition: 'transform 0.2s' }}>→</span>
           </button>
         </div>
 
@@ -269,10 +264,16 @@ export default function Home({ role, setRole, onStart, onDashboard, onAbout, onB
                   color: 'var(--text-secondary)', borderRadius: 10, padding: '12px 20px',
                   fontSize: 14, cursor: 'pointer', fontFamily: 'var(--font-body)',
                 }}>Dashboard</button>
-                <button className="btn-primary btn-shine" onClick={onStart} style={{
-                  borderRadius: 10, padding: '12px 28px', fontSize: 15, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'var(--font-body)',
-                }}>Start Interview →</button>
+                <button onClick={onStart} style={{
+                  background: 'var(--accent-a)', color: 'var(--bg-card)',
+                  border: 'none', borderRadius: 10, padding: '12px 28px',
+                  fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'var(--font-body)', boxShadow: '0 4px 16px var(--glow-a)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px var(--glow-a)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 16px var(--glow-a)'; }}
+                >Start Interview →</button>
               </div>
             </div>
           </div>
