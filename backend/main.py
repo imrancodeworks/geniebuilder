@@ -166,7 +166,7 @@ def _send_via_resend(target_email: str, otp: str, from_name: str) -> None:
         "https://api.resend.com/emails",
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         json=payload,
-        timeout=15,
+        timeout=10,
     )
 
     if resp.status_code not in (200, 201):
@@ -223,7 +223,7 @@ def _send_via_smtp(target_email: str, otp: str, from_name: str) -> None:
     # Attempt 1 – STARTTLS (port 587, works on most providers)
     if smtp_port != 465:
         try:
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
@@ -244,7 +244,7 @@ def _send_via_smtp(target_email: str, otp: str, from_name: str) -> None:
     if not sent:
         try:
             ctx = _ssl.create_default_context()
-            with smtplib.SMTP_SSL(smtp_host, 465, timeout=20, context=ctx) as server:
+            with smtplib.SMTP_SSL(smtp_host, 465, timeout=8, context=ctx) as server:
                 server.login(smtp_user, smtp_pass)
                 server.send_message(email_msg)
                 sent = True
@@ -363,7 +363,7 @@ def login(user: UserAuth):
 # ─── Forgot Password Routes ───────────────────────────────────────────────────
 
 @app.post("/api/forgot-password")
-async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTasks):
+def forgot_password(body: ForgotPassword):
     """Generate OTP and send it to email."""
     _require_db()
     user = users_collection.find_one({"email": body.email})
@@ -380,17 +380,21 @@ async def forgot_password(body: ForgotPassword, background_tasks: BackgroundTask
         upsert=True,
     )
 
-    # Send synchronously so SMTP errors surface to the user immediately
+    # Send email — catch ALL exceptions so server never returns 502
     try:
         send_otp_email(body.email, otp)
+        return {"message": "OTP sent! Check your inbox (and spam folder)."}
     except RuntimeError as exc:
         otp_collection.delete_one({"email": body.email})
         logger.error(f"OTP email failed for {body.email}: {exc}")
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception as exc:
+        otp_collection.delete_one({"email": body.email})
+        logger.error(f"Unexpected OTP error for {body.email}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=503,
-            detail=str(exc)
+            detail=f"Failed to send OTP: {type(exc).__name__}: {exc}"
         )
-    return {"message": "OTP sent! Check your inbox (and spam folder)."}
 
 
 @app.post("/api/verify-otp")
